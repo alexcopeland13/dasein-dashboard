@@ -63,12 +63,12 @@ const Index = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-6 bg-card border-border/10">
+            <Card className="p-6 metric-card">
               <h2 className="text-lg font-semibold mb-4 text-white">NAV Performance</h2>
               {/* Chart implementation will go here */}
             </Card>
             
-            <Card className="p-6 bg-card border-border/10">
+            <Card className="p-6 metric-card">
               <h2 className="text-lg font-semibold mb-4 text-white">Recent Activity</h2>
               <div className="space-y-4">
                 <ActivityItem
@@ -108,13 +108,13 @@ const MetricCard = ({
   const isPositive = trend >= 0;
   
   return (
-    <Card className="p-6 bg-card border-border/10">
+    <Card className="p-6 metric-card">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-gray-400">{title}</p>
           <p className="text-2xl font-bold mt-1 text-white">{value}</p>
         </div>
-        <div className="p-2 bg-muted rounded-lg">
+        <div className="p-2 bg-white/5 rounded-lg">
           {icon}
         </div>
       </div>
@@ -149,7 +149,7 @@ const ActivityItem = ({
   const isContribution = type === 'contribution';
   
   return (
-    <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+    <div className="flex items-center justify-between p-4 rounded-lg activity-item">
       <div className="flex items-center space-x-4">
         <div className={`p-2 rounded-full ${
           isContribution ? 'bg-success-DEFAULT/20' : 'bg-danger-DEFAULT/20'

@@ -16,7 +16,7 @@ const DashboardNav = () => {
         <img 
           src="/lovable-uploads/89bff80d-5482-4dde-9dcf-f38b43a488b6.png" 
           alt="Dasein" 
-          className="h-8"
+          className="h-12"
         />
       </div>
       
