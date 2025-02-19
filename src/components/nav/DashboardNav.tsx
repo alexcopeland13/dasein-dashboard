@@ -11,10 +11,13 @@ import {
 
 const DashboardNav = () => {
   return (
-    <div className="fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 p-4 space-y-6 animate-fade-in">
-      <div className="flex items-center space-x-2 px-2 py-4">
-        <DollarSign className="w-8 h-8 text-primary" />
-        <h1 className="text-xl font-semibold">Fund Dashboard</h1>
+    <div className="fixed top-0 left-0 h-full w-64 dasein-gradient p-4 space-y-6 animate-fade-in">
+      <div className="flex items-center justify-center px-2 py-8">
+        <img 
+          src="/lovable-uploads/90801488-60e0-4876-969c-5fb4e0255485.png" 
+          alt="Dasein" 
+          className="h-8"
+        />
       </div>
       
       <nav className="space-y-1">
@@ -43,8 +46,8 @@ const NavItem = ({
       to={to}
       className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
         active 
-          ? "bg-primary text-primary-foreground" 
-          : "text-gray-600 hover:bg-gray-100"
+          ? "nav-link-active text-accent" 
+          : "text-gray-300 hover:bg-white/5"
       }`}
     >
       <span className="w-5 h-5">{icon}</span>

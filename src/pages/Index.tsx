@@ -28,14 +28,14 @@ const Index = () => {
   const totalInvestors = 24;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <DashboardNav />
       
       <main className="ml-64 p-8 animate-fade-up">
         <div className="max-w-7xl mx-auto">
           <header className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600 mt-2">Fund performance and metrics overview</p>
+            <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+            <p className="text-gray-400 mt-2">Fund performance and metrics overview</p>
           </header>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -63,13 +63,13 @@ const Index = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">NAV Performance</h2>
+            <Card className="p-6 bg-card border-border/10">
+              <h2 className="text-lg font-semibold mb-4 text-white">NAV Performance</h2>
               {/* Chart implementation will go here */}
             </Card>
             
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
+            <Card className="p-6 bg-card border-border/10">
+              <h2 className="text-lg font-semibold mb-4 text-white">Recent Activity</h2>
               <div className="space-y-4">
                 <ActivityItem
                   type="contribution"
@@ -108,13 +108,13 @@ const MetricCard = ({
   const isPositive = trend >= 0;
   
   return (
-    <Card className="p-6">
+    <Card className="p-6 bg-card border-border/10">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-2xl font-bold mt-1">{value}</p>
+          <p className="text-sm font-medium text-gray-400">{title}</p>
+          <p className="text-2xl font-bold mt-1 text-white">{value}</p>
         </div>
-        <div className="p-2 bg-gray-100 rounded-lg">
+        <div className="p-2 bg-muted rounded-lg">
           {icon}
         </div>
       </div>
@@ -129,7 +129,7 @@ const MetricCard = ({
         }`}>
           {Math.abs(trend)}%
         </span>
-        <span className="text-sm text-gray-600">{trendLabel}</span>
+        <span className="text-sm text-gray-400">{trendLabel}</span>
       </div>
     </Card>
   );
@@ -149,10 +149,10 @@ const ActivityItem = ({
   const isContribution = type === 'contribution';
   
   return (
-    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+    <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
       <div className="flex items-center space-x-4">
         <div className={`p-2 rounded-full ${
-          isContribution ? 'bg-success-light' : 'bg-danger-light'
+          isContribution ? 'bg-success-DEFAULT/20' : 'bg-danger-DEFAULT/20'
         }`}>
           {isContribution ? (
             <ArrowUp className={`w-4 h-4 text-success-DEFAULT`} />
@@ -161,8 +161,8 @@ const ActivityItem = ({
           )}
         </div>
         <div>
-          <p className="font-medium">{investor}</p>
-          <p className="text-sm text-gray-600">
+          <p className="font-medium text-white">{investor}</p>
+          <p className="text-sm text-gray-400">
             {new Date(date).toLocaleDateString()}
           </p>
         </div>
@@ -173,7 +173,7 @@ const ActivityItem = ({
         }`}>
           {isContribution ? '+' : '-'}${(amount / 1000).toFixed(1)}k
         </p>
-        <p className="text-sm text-gray-600">{type}</p>
+        <p className="text-sm text-gray-400">{type}</p>
       </div>
     </div>
   );
