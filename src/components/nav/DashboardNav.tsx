@@ -14,7 +14,7 @@ const DashboardNav = () => {
     <div className="fixed top-0 left-0 h-full w-64 dasein-gradient p-4 space-y-6 animate-fade-in">
       <div className="flex items-center justify-center px-2 py-8">
         <img 
-          src="/lovable-uploads/90801488-60e0-4876-969c-5fb4e0255485.png" 
+          src="/lovable-uploads/89bff80d-5482-4dde-9dcf-f38b43a488b6.png" 
           alt="Dasein" 
           className="h-8"
         />

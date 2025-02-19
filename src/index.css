@@ -14,27 +14,35 @@
     --popover: 232 47% 20%;
     --popover-foreground: 0 0% 100%;
  
-    --primary: 232 47% 20%;
+    --primary: 28 26 75;
     --primary-foreground: 0 0% 100%;
  
-    --secondary: 199 36% 77%;
-    --secondary-foreground: 232 47% 20%;
+    --secondary: 151 222 244;
+    --secondary-foreground: 39 20 69;
  
-    --muted: 232 47% 30%;
-    --muted-foreground: 215 20% 80%;
+    --muted: 121 123 132;
+    --muted-foreground: 232 241 248;
  
-    --accent: 199 36% 77%;
-    --accent-foreground: 232 47% 20%;
+    --accent: 178 247 245;
+    --accent-foreground: 39 20 69;
  
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 232 47% 25%;
-    --input: 232 47% 25%;
-    --ring: 199 36% 77%;
+    --border: 39 20 69;
+    --input: 39 20 69;
+    --ring: 151 222 244;
  
     --radius: 0.5rem;
   }
+
+  .brand-color-primary { color: rgb(28, 26, 75); }
+  .brand-color-secondary { color: rgb(39, 20, 69); }
+  .brand-color-light { color: rgb(232, 241, 248); }
+  .brand-color-accent-1 { color: rgb(151, 222, 244); }
+  .brand-color-accent-2 { color: rgb(178, 247, 245); }
+  .brand-color-neutral { color: rgb(121, 123, 132); }
+  .brand-color-warm { color: rgb(243, 211, 189); }
 }
  
 @layer base {
@@ -64,7 +72,7 @@
 
 /* Brand-specific styles */
 .dasein-gradient {
-  background: linear-gradient(135deg, #1C1A4B 0%, #282675 100%);
+  background: linear-gradient(135deg, rgb(28, 26, 75) 0%, rgb(39, 20, 69) 100%);
 }
 
 .nav-link-active {
