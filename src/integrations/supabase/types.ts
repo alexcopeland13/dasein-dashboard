@@ -42,6 +42,36 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_nav: {
+        Row: {
+          aum_change: number | null
+          created_at: string
+          id: number
+          management_fees: number | null
+          month_end_date: string
+          monthly_return: number | null
+          total_nav: number
+        }
+        Insert: {
+          aum_change?: number | null
+          created_at?: string
+          id?: number
+          management_fees?: number | null
+          month_end_date: string
+          monthly_return?: number | null
+          total_nav: number
+        }
+        Update: {
+          aum_change?: number | null
+          created_at?: string
+          id?: number
+          management_fees?: number | null
+          month_end_date?: string
+          monthly_return?: number | null
+          total_nav?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
