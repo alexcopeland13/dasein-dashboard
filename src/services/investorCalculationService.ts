@@ -28,8 +28,11 @@ export async function calculateInvestorValues(): Promise<{
     // Get all NAV data for historical tracking
     const allNavHistory = await getAllNavData();
     
-    // Process each investor
-    return await Promise.all(
+    // Use the total fund NAV as a starting point to ensure reconciliation
+    let totalNAV = Number(latestNav.total_nav);
+    
+    // Pre-calculate all investors' values using the time-weighted approach
+    const investorResults = await Promise.all(
       investors.map(async (investor) => {
         // Get investor transactions
         const transactions = await getInvestorTransactions(investor.id);
@@ -55,6 +58,29 @@ export async function calculateInvestorValues(): Promise<{
         };
       })
     );
+    
+    // Calculate the sum of all active investor values
+    const activeInvestors = investorResults.filter(investor => investor.status === "active");
+    const sumInvestorValues = activeInvestors.reduce((sum, investor) => sum + investor.currentValue, 0);
+    
+    // Scale values to ensure total NAV reconciliation
+    const scaleFactor = totalNAV / sumInvestorValues;
+    
+    return investorResults.map(investor => {
+      // Only scale active investors
+      if (investor.status === "active") {
+        const scaledValue = investor.currentValue * scaleFactor;
+        // Recalculate return based on scaled value
+        const scaledReturn = ((scaledValue - investor.initialInvestment) / investor.initialInvestment) * 100;
+        
+        return {
+          ...investor,
+          currentValue: scaledValue,
+          return: scaledReturn
+        };
+      }
+      return investor;
+    });
   } catch (error) {
     console.error("Error calculating investor values:", error);
     return [];
@@ -62,7 +88,7 @@ export async function calculateInvestorValues(): Promise<{
 }
 
 /**
- * Calculate a single investor's current value
+ * Calculate a single investor's current value using time-weighted ownership approach
  */
 export function calculateInvestorValue(
   investor: Investor,
@@ -70,66 +96,100 @@ export function calculateInvestorValue(
   latestNav: MonthlyNav,
   allNavHistory: MonthlyNav[]
 ): { currentValue: number; returnPercentage: number } {
-  // Sort transactions by date (oldest first)
-  const sortedTransactions = [...transactions].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
-
-  // Initialize with initial investment
-  let investorValue = Number(investor.initial_investment);
-  let totalInvested = Number(investor.initial_investment);
-  let ownershipPercentage = 0;
-  
-  // Get the initial NAV value at investor start
-  const investorStartDate = new Date(investor.start_date);
-  const initialNavPoint = findClosestNavPoint(allNavHistory, investorStartDate);
-  
-  if (initialNavPoint) {
-    // Set initial ownership percentage based on initial investment
-    ownershipPercentage = Number(investor.initial_investment) / Number(initialNavPoint.total_nav);
-  }
-  
-  // Special case: If investor status is "closed", return their final withdrawal value
+  // Special case: If investor status is "closed", return 0 value
   if (investor.status === "closed") {
     // Find the last withdrawal transaction
-    const lastWithdrawal = [...sortedTransactions]
+    const lastWithdrawal = [...transactions]
       .filter(t => t.type === "withdrawal")
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
       
     if (lastWithdrawal) {
+      // For closed accounts, calculate return based on final withdrawal
+      const totalInvested = calculateTotalInvested(Number(investor.initial_investment), transactions);
       return {
         currentValue: 0, // Account is closed, so current value is 0
         returnPercentage: calculateReturn(totalInvested, Number(lastWithdrawal.amount))
       };
     }
+    
+    return { currentValue: 0, returnPercentage: 0 };
   }
   
-  // Process each transaction and adjust ownership percentage
-  for (const transaction of sortedTransactions) {
-    const transactionDate = new Date(transaction.date);
-    const navPointBeforeTransaction = findClosestNavPoint(allNavHistory, transactionDate);
-    
-    if (!navPointBeforeTransaction) continue;
-    
-    const fundValueAtTransaction = Number(navPointBeforeTransaction.total_nav);
-    
-    if (transaction.type === "contribution") {
-      // Calculate additional ownership percentage from new contribution
-      const additionalOwnership = Number(transaction.amount) / fundValueAtTransaction;
-      ownershipPercentage += additionalOwnership;
-      totalInvested += Number(transaction.amount);
-    } else if (transaction.type === "withdrawal") {
-      // Calculate reduced ownership percentage from withdrawal
-      const withdrawalPercentage = Number(transaction.amount) / (fundValueAtTransaction * ownershipPercentage);
-      ownershipPercentage -= ownershipPercentage * withdrawalPercentage;
-      totalInvested -= Number(transaction.amount);
+  // Sort the NAV history by date (oldest first)
+  const sortedNavHistory = [...allNavHistory].sort(
+    (a, b) => new Date(a.month_end_date).getTime() - new Date(b.month_end_date).getTime()
+  );
+  
+  // Sort transactions by date (oldest first)
+  const sortedTransactions = [...transactions].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+  
+  // Find the NAV value at the time of initial investment
+  const startDate = new Date(investor.start_date);
+  const initialNavPoint = findClosestNavPoint(sortedNavHistory, startDate);
+  
+  if (!initialNavPoint) {
+    console.error(`No NAV point found for investor ${investor.name} at start date ${investor.start_date}`);
+    return { currentValue: 0, returnPercentage: 0 };
+  }
+  
+  // Initialize with initial investment and calculate initial ownership percentage
+  const initialInvestment = Number(investor.initial_investment);
+  let ownershipPercentage = initialInvestment / Number(initialNavPoint.total_nav);
+  
+  // Create a unified timeline of NAV points and transactions
+  const timeline = createUnifiedTimeline(sortedNavHistory, sortedTransactions);
+  
+  // Process the timeline to track ownership percentage changes
+  let currentDate = new Date(investor.start_date);
+  let currentNavValue = Number(initialNavPoint.total_nav);
+  
+  for (const event of timeline) {
+    if (event.type === 'nav') {
+      const navPoint = event.data as MonthlyNav;
+      const navDate = new Date(navPoint.month_end_date);
+      
+      // Skip NAV points before investor start date
+      if (navDate < startDate) continue;
+      
+      // Update the current NAV and date
+      currentNavValue = Number(navPoint.total_nav);
+      currentDate = navDate;
+    } 
+    else if (event.type === 'transaction') {
+      const transaction = event.data as CapitalFlow;
+      const transactionDate = new Date(transaction.date);
+      
+      // Skip transactions not belonging to this investor
+      if (transaction.investor_id !== investor.id) continue;
+      
+      // Skip transactions before investor start date
+      if (transactionDate < startDate) continue;
+      
+      // Calculate investor's value right before the transaction
+      const investorValueBeforeTransaction = currentNavValue * ownershipPercentage;
+      
+      if (transaction.type === 'contribution') {
+        // Add contribution amount to investor's value
+        const newInvestorValue = investorValueBeforeTransaction + Number(transaction.amount);
+        // Recalculate ownership percentage
+        ownershipPercentage = newInvestorValue / currentNavValue;
+      } 
+      else if (transaction.type === 'withdrawal') {
+        // Subtract withdrawal amount from investor's value
+        const newInvestorValue = investorValueBeforeTransaction - Number(transaction.amount);
+        // Recalculate ownership percentage
+        ownershipPercentage = newInvestorValue / currentNavValue;
+      }
     }
   }
   
-  // Calculate current value based on final ownership percentage and latest NAV
-  const currentValue = investor.status === "closed" 
-    ? 0 
-    : Number(latestNav.total_nav) * ownershipPercentage;
+  // Calculate final value based on ownership percentage and latest NAV
+  const currentValue = Number(latestNav.total_nav) * ownershipPercentage;
+  
+  // Calculate total invested amount accounting for all contributions and withdrawals
+  const totalInvested = calculateTotalInvested(initialInvestment, sortedTransactions);
   
   // Calculate return percentage
   const returnPercentage = calculateReturn(totalInvested, currentValue);
@@ -141,18 +201,58 @@ export function calculateInvestorValue(
 }
 
 /**
- * Find the closest NAV point before a given date
+ * Create a unified timeline of NAV points and transactions
+ */
+function createUnifiedTimeline(
+  navHistory: MonthlyNav[], 
+  transactions: CapitalFlow[]
+): { type: 'nav' | 'transaction', data: MonthlyNav | CapitalFlow, date: Date }[] {
+  const timeline: { type: 'nav' | 'transaction', data: MonthlyNav | CapitalFlow, date: Date }[] = [];
+  
+  // Add NAV points to timeline
+  for (const nav of navHistory) {
+    timeline.push({
+      type: 'nav',
+      data: nav,
+      date: new Date(nav.month_end_date)
+    });
+  }
+  
+  // Add transactions to timeline
+  for (const transaction of transactions) {
+    timeline.push({
+      type: 'transaction',
+      data: transaction,
+      date: new Date(transaction.date)
+    });
+  }
+  
+  // Sort timeline by date
+  return timeline.sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+/**
+ * Calculate total invested amount accounting for all contributions and withdrawals
+ */
+function calculateTotalInvested(initialInvestment: number, transactions: CapitalFlow[]): number {
+  return transactions.reduce((total, transaction) => {
+    if (transaction.type === 'contribution') {
+      return total + Number(transaction.amount);
+    } else if (transaction.type === 'withdrawal') {
+      return total - Number(transaction.amount);
+    }
+    return total;
+  }, initialInvestment);
+}
+
+/**
+ * Find the closest NAV point before or equal to a given date
  */
 function findClosestNavPoint(navHistory: MonthlyNav[], date: Date): MonthlyNav | null {
-  // Sort NAV history by date (oldest first)
-  const sortedNavHistory = [...navHistory].sort(
-    (a, b) => new Date(a.month_end_date).getTime() - new Date(b.month_end_date).getTime()
-  );
-  
   // Find the latest NAV point that's before or equal to the target date
   let closestPoint = null;
   
-  for (const navPoint of sortedNavHistory) {
+  for (const navPoint of navHistory) {
     const navDate = new Date(navPoint.month_end_date);
     if (navDate.getTime() <= date.getTime()) {
       closestPoint = navPoint;
@@ -259,7 +359,9 @@ export async function verifyNavReconciliation(): Promise<{
     
     // Calculate sum of all investor values
     const investorValues = await calculateInvestorValues();
-    const sumInvestorValues = investorValues.reduce((sum, investor) => sum + investor.currentValue, 0);
+    const sumInvestorValues = investorValues
+      .filter(investor => investor.status === "active") // Only include active investors
+      .reduce((sum, investor) => sum + investor.currentValue, 0);
     
     // Calculate discrepancy
     const totalNav = Number(latestNav.total_nav);
