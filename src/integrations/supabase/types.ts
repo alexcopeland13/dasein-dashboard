@@ -9,43 +9,81 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      capital_flows: {
+        Row: {
+          amount: number
+          created_at: string | null
+          date: string
+          id: number
+          investor_id: string
+          investor_name: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          date: string
+          id?: number
+          investor_id: string
+          investor_name: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          date?: string
+          id?: number
+          investor_id?: string
+          investor_name?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capital_flows_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investors: {
         Row: {
           created_at: string | null
           id: string
-          initial_investment: number | null
-          mgmt_fee_rate: number | null
+          initial_investment: number
+          mgmt_fee_rate: number
           name: string
-          performance_fee_rate: number | null
-          start_date: string | null
-          status: string | null
+          performance_fee_rate: number
+          start_date: string
+          status: string
         }
         Insert: {
           created_at?: string | null
           id?: string
-          initial_investment?: number | null
-          mgmt_fee_rate?: number | null
+          initial_investment: number
+          mgmt_fee_rate: number
           name: string
-          performance_fee_rate?: number | null
-          start_date?: string | null
-          status?: string | null
+          performance_fee_rate: number
+          start_date: string
+          status: string
         }
         Update: {
           created_at?: string | null
           id?: string
-          initial_investment?: number | null
-          mgmt_fee_rate?: number | null
+          initial_investment?: number
+          mgmt_fee_rate?: number
           name?: string
-          performance_fee_rate?: number | null
-          start_date?: string | null
-          status?: string | null
+          performance_fee_rate?: number
+          start_date?: string
+          status?: string
         }
         Relationships: []
       }
       monthly_nav: {
         Row: {
           aum_change: number | null
-          created_at: string
+          created_at: string | null
           id: number
           management_fees: number | null
           month_end_date: string
@@ -54,7 +92,7 @@ export type Database = {
         }
         Insert: {
           aum_change?: number | null
-          created_at?: string
+          created_at?: string | null
           id?: number
           management_fees?: number | null
           month_end_date: string
@@ -63,7 +101,7 @@ export type Database = {
         }
         Update: {
           aum_change?: number | null
-          created_at?: string
+          created_at?: string | null
           id?: number
           management_fees?: number | null
           month_end_date?: string
