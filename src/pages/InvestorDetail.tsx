@@ -28,8 +28,10 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   getInvestorById, 
   getInvestorTransactions, 
-  getLatestNav
-} from "@/services/navService";
+  getLatestNav,
+  getAllNavData
+} from "@/services/dataService";
+import { calculateInvestorValue } from "@/services/investorCalculationService";
 import CapitalFlowForm from "@/components/investors/CapitalFlowForm";
 
 const formatCurrency = (value: number) => {
@@ -51,6 +53,7 @@ const InvestorDetail = () => {
   const [returnPercentage, setReturnPercentage] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const [historicalBalances, setHistoricalBalances] = useState<any[]>([]);
 
   const fetchInvestorData = async () => {
     if (!id) return;
@@ -74,34 +77,32 @@ const InvestorDetail = () => {
       const transactionData = await getInvestorTransactions(id);
       setTransactions(transactionData);
       
-      // Calculate current value based on ownership percentage
+      // Get all NAV history
+      const allNavHistory = await getAllNavData();
+      
+      // Get latest NAV
       const latestNav = await getLatestNav();
-      if (latestNav) {
-        // This is a simplified calculation - in a real system, you'd need a more sophisticated
-        // way to track ownership percentage that accounts for all contributions and withdrawals
-        const initialInvestment = Number(investorData.initial_investment);
+      
+      if (latestNav && allNavHistory.length > 0) {
+        // Import the calculateInvestorValue function from our new service
+        const result = calculateInvestorValue(
+          investorData,
+          transactionData,
+          latestNav,
+          allNavHistory
+        );
         
-        // Calculate total contributions and withdrawals
-        const totalContributions = transactionData
-          .filter(t => t.type === 'contribution')
-          .reduce((sum, t) => sum + Number(t.amount), 0);
-          
-        const totalWithdrawals = transactionData
-          .filter(t => t.type === 'withdrawal')
-          .reduce((sum, t) => sum + Number(t.amount), 0);
+        setCurrentValue(result.currentValue);
+        setReturnPercentage(result.returnPercentage);
         
-        // Calculate total invested
-        const totalInvested = initialInvestment + totalContributions - totalWithdrawals;
-        
-        // This is a simplification - assuming ownership proportion based on initial investment
-        // In a real system, you'd need to track the exact ownership percentage over time
-        const estimatedCurrentValue = latestNav.total_nav * (initialInvestment / 20000000); // Assuming $20M initial fund size
-        
-        setCurrentValue(estimatedCurrentValue);
-        
-        // Calculate return percentage
-        const returnPct = ((estimatedCurrentValue - totalInvested) / totalInvested) * 100;
-        setReturnPercentage(returnPct);
+        // Calculate historical balances for chart
+        setHistoricalBalances(
+          calculateHistoricalBalances(
+            investorData,
+            transactionData,
+            allNavHistory
+          )
+        );
       }
     } catch (error) {
       console.error("Error fetching investor data:", error);
@@ -115,39 +116,117 @@ const InvestorDetail = () => {
     }
   };
 
+  // Calculate historical balances over time
+  const calculateHistoricalBalances = (
+    investor: any,
+    transactions: any[],
+    navHistory: any[]
+  ) => {
+    // Sort transactions by date (oldest first)
+    const sortedTransactions = [...transactions].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    
+    // Sort NAV points by date (oldest first)
+    const sortedNavHistory = [...navHistory].sort(
+      (a, b) => new Date(a.month_end_date).getTime() - new Date(b.month_end_date).getTime()
+    );
+    
+    const balanceHistory: any[] = [];
+    let currentOwnership = 0;
+    let lastProcessedNavIndex = -1;
+    
+    // Find initial NAV point (closest to investor start date)
+    const startDate = new Date(investor.start_date);
+    for (let i = 0; i < sortedNavHistory.length; i++) {
+      const navDate = new Date(sortedNavHistory[i].month_end_date);
+      if (navDate >= startDate) {
+        // Found first NAV point after investor start
+        if (i > 0) {
+          // Use the previous NAV point
+          lastProcessedNavIndex = i - 1;
+          currentOwnership = Number(investor.initial_investment) / Number(sortedNavHistory[lastProcessedNavIndex].total_nav);
+          
+          // Add initial balance point
+          balanceHistory.push({
+            date: format(new Date(sortedNavHistory[lastProcessedNavIndex].month_end_date), 'MMM yyyy'),
+            balance: Number(investor.initial_investment)
+          });
+        } else {
+          // Use the first available NAV point
+          lastProcessedNavIndex = 0;
+          currentOwnership = Number(investor.initial_investment) / Number(sortedNavHistory[0].total_nav);
+          
+          // Add initial balance point
+          balanceHistory.push({
+            date: format(new Date(sortedNavHistory[0].month_end_date), 'MMM yyyy'),
+            balance: Number(investor.initial_investment)
+          });
+        }
+        break;
+      }
+    }
+    
+    // If no suitable NAV point found, use the first one
+    if (lastProcessedNavIndex === -1 && sortedNavHistory.length > 0) {
+      lastProcessedNavIndex = 0;
+      currentOwnership = Number(investor.initial_investment) / Number(sortedNavHistory[0].total_nav);
+      
+      // Add initial balance point
+      balanceHistory.push({
+        date: format(new Date(sortedNavHistory[0].month_end_date), 'MMM yyyy'),
+        balance: Number(investor.initial_investment)
+      });
+    }
+    
+    // Process each NAV point and transaction
+    let transactionIndex = 0;
+    
+    for (let i = lastProcessedNavIndex + 1; i < sortedNavHistory.length; i++) {
+      const navPoint = sortedNavHistory[i];
+      const navDate = new Date(navPoint.month_end_date);
+      
+      // Process all transactions that occurred before this NAV point
+      while (
+        transactionIndex < sortedTransactions.length && 
+        new Date(sortedTransactions[transactionIndex].date) <= navDate
+      ) {
+        const transaction = sortedTransactions[transactionIndex];
+        const prevNavPoint = sortedNavHistory[i - 1];
+        const fundValueAtTransaction = Number(prevNavPoint.total_nav);
+        
+        if (transaction.type === "contribution") {
+          // Add ownership from contribution
+          const additionalOwnership = Number(transaction.amount) / fundValueAtTransaction;
+          currentOwnership += additionalOwnership;
+        } else if (transaction.type === "withdrawal") {
+          // Reduce ownership from withdrawal
+          const currentValue = fundValueAtTransaction * currentOwnership;
+          const withdrawalPercentage = Number(transaction.amount) / currentValue;
+          currentOwnership -= currentOwnership * withdrawalPercentage;
+        }
+        
+        transactionIndex++;
+      }
+      
+      // Calculate balance at this NAV point
+      const balance = investor.status === "closed" && i === sortedNavHistory.length - 1
+        ? 0  // If account is closed, final balance is 0
+        : Number(navPoint.total_nav) * currentOwnership;
+      
+      // Add to balance history
+      balanceHistory.push({
+        date: format(navDate, 'MMM yyyy'),
+        balance: balance
+      });
+    }
+    
+    return balanceHistory;
+  };
+
   useEffect(() => {
     fetchInvestorData();
   }, [id]);
-
-  // Sort transactions by date (newest first) and generate chart data
-  const sortedTransactions = [...transactions].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
-
-  // Generate chart data (this is simplified - in a real app you'd need to calculate balance over time)
-  const chartData = transactions.length > 0 
-    ? transactions
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .reduce((acc: any[], transaction, index) => {
-          const prevBalance = index > 0 ? acc[index - 1].balance : Number(investor?.initial_investment || 0);
-          const change = transaction.type === 'contribution' 
-            ? Number(transaction.amount) 
-            : -Number(transaction.amount);
-          
-          return [...acc, {
-            date: format(new Date(transaction.date), 'MMM yyyy'),
-            balance: prevBalance + change
-          }];
-        }, [])
-    : [];
-
-  // Add current balance point to chart
-  if (chartData.length > 0 && currentValue) {
-    chartData.push({
-      date: 'Current',
-      balance: currentValue
-    });
-  }
 
   if (loading) {
     return (
@@ -230,16 +309,16 @@ const InvestorDetail = () => {
         />
         <MetricCard
           title="Current Value"
-          value={currentValue ? formatCurrency(currentValue) : "Calculating..."}
+          value={currentValue !== null ? formatCurrency(currentValue) : "Calculating..."}
           icon={<TrendingUp className="h-5 w-5" />}
         />
         <MetricCard
           title="Return"
-          value={returnPercentage ? `${returnPercentage.toFixed(2)}%` : "Calculating..."}
-          icon={returnPercentage && returnPercentage >= 0 
+          value={returnPercentage !== null ? `${returnPercentage.toFixed(2)}%` : "Calculating..."}
+          icon={returnPercentage !== null && returnPercentage >= 0 
             ? <ArrowUp className="h-5 w-5 text-success-DEFAULT" /> 
             : <ArrowDown className="h-5 w-5 text-danger-DEFAULT" />}
-          valueColor={returnPercentage && returnPercentage >= 0 ? "text-success-DEFAULT" : "text-danger-DEFAULT"}
+          valueColor={returnPercentage !== null && returnPercentage >= 0 ? "text-success-DEFAULT" : "text-danger-DEFAULT"}
         />
       </div>
       
@@ -261,11 +340,11 @@ const InvestorDetail = () => {
               </div>
             </div>
             
-            {chartData.length > 0 ? (
+            {historicalBalances.length > 0 ? (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
-                    data={chartData}
+                    data={historicalBalances}
                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />

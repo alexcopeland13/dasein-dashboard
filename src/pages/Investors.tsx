@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -15,10 +14,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Plus, Search, ArrowUpDown } from "lucide-react";
 import { InvestorRow } from "@/components/investors/InvestorRow";
 import InvestorForm from "@/components/investors/InvestorForm";
-import { 
-  calculateInvestorValues, 
-  getInvestorTransactions 
-} from "@/services/navService";
+import { getInvestorTransactions } from "@/services/dataService";
+import { calculateInvestorValues } from "@/services/investorCalculationService";
 import { useToast } from "@/hooks/use-toast";
 
 type SortKey = 'name' | 'initialInvestment' | 'currentValue' | 'return' | 'status';
@@ -56,7 +53,6 @@ const InvestorsPage = () => {
       const investorValues = await calculateInvestorValues();
       setInvestors(investorValues);
 
-      // Fetch transactions for all investors
       const transactions: Record<string, any[]> = {};
       for (const investor of investorValues) {
         const investorTransactions = await getInvestorTransactions(investor.id);
@@ -91,7 +87,6 @@ const InvestorsPage = () => {
     } else if (key === 'status') {
       return a.status.localeCompare(b.status) * factor;
     } else {
-      // For numerical values
       return ((a[key] as number) - (b[key] as number)) * factor;
     }
   });
