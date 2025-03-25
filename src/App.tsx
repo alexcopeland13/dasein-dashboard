@@ -4,6 +4,7 @@ import DashboardNav from "./components/nav/DashboardNav";
 import Index from "./pages/Index";
 import InvestorsPage from "./pages/Investors";
 import InvestorDetail from "./pages/InvestorDetail";
+import Performance from "./pages/Performance";
 import NotFound from "./pages/NotFound";
 import { Toaster } from "./components/ui/toaster";
 import "./App.css";
@@ -18,6 +19,7 @@ function App() {
             <Route path="/" element={<Index />} />
             <Route path="/investors" element={<InvestorsPage />} />
             <Route path="/investors/:id" element={<InvestorDetail />} />
+            <Route path="/performance" element={<Performance />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
