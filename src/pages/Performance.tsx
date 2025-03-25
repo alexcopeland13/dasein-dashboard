@@ -125,7 +125,7 @@ const Performance = () => {
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-8">
           <PerformanceMetrics 
             annualizedReturn={annualizedReturn}
             volatility={volatility}
@@ -136,10 +136,12 @@ const Performance = () => {
             loading={loading}
           />
           
-          <PerformanceChart 
-            navData={navData}
-            loading={loading}
-          />
+          <div className="mb-8">
+            <PerformanceChart 
+              navData={navData}
+              loading={loading}
+            />
+          </div>
           
           <PerformanceTable 
             navData={navData}
@@ -147,7 +149,7 @@ const Performance = () => {
           />
         </TabsContent>
 
-        <TabsContent value="returns" className="space-y-6">
+        <TabsContent value="returns" className="space-y-8">
           <PerformanceMetrics 
             annualizedReturn={annualizedReturn}
             volatility={volatility}
@@ -158,10 +160,12 @@ const Performance = () => {
             loading={loading}
           />
           
-          <ReturnHeatMap 
-            navData={navData}
-            loading={loading}
-          />
+          <div className="mb-8">
+            <ReturnHeatMap 
+              navData={navData}
+              loading={loading}
+            />
+          </div>
           
           <PerformanceTable 
             navData={navData}
@@ -169,7 +173,7 @@ const Performance = () => {
           />
         </TabsContent>
 
-        <TabsContent value="transactions" className="space-y-6">
+        <TabsContent value="transactions" className="space-y-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <TransactionsTable 
