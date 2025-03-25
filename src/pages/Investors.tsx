@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -17,6 +18,7 @@ import InvestorForm from "@/components/investors/InvestorForm";
 import { getInvestorTransactions } from "@/services/dataService";
 import { calculateInvestorValues } from "@/services/investorCalculationService";
 import { useToast } from "@/hooks/use-toast";
+import NavReconciliation from "@/components/dashboard/NavReconciliation";
 
 type SortKey = 'name' | 'initialInvestment' | 'currentValue' | 'return' | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -46,6 +48,7 @@ const InvestorsPage = () => {
   });
   const [expandedInvestors, setExpandedInvestors] = useState<Record<string, boolean>>({});
   const [investorTransactions, setInvestorTransactions] = useState<Record<string, any[]>>({});
+  const [isReconciled, setIsReconciled] = useState<boolean | null>(null);
 
   const fetchInvestors = async () => {
     setIsLoading(true);
@@ -99,6 +102,18 @@ const InvestorsPage = () => {
     navigate(`/investors/${id}`);
   };
 
+  const handleReconciliationComplete = (isReconciled: boolean) => {
+    setIsReconciled(isReconciled);
+    
+    if (!isReconciled) {
+      toast({
+        title: "NAV Reconciliation Warning",
+        description: "The sum of investor values doesn't match the total fund NAV. Please review the calculations.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const SortButton = ({ label, sortKey }: { label: string; sortKey: SortKey }) => (
     <Button 
       variant="ghost" 
@@ -129,63 +144,71 @@ const InvestorsPage = () => {
         onOpenChange={setShowAddForm} 
         onSuccess={fetchInvestors} 
       />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>All Investors</span>
-            <div className="relative w-64">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search investors..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : error ? (
-            <div className="text-destructive">{error}</div>
-          ) : filteredInvestors.length === 0 ? (
-            <div className="text-muted-foreground py-8 text-center">
-              {searchTerm ? "No investors match your search" : "No investors found"}
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead><SortButton label="Investor Name" sortKey="name" /></TableHead>
-                    <TableHead><SortButton label="Initial Investment" sortKey="initialInvestment" /></TableHead>
-                    <TableHead><SortButton label="Current Value" sortKey="currentValue" /></TableHead>
-                    <TableHead><SortButton label="Return %" sortKey="return" /></TableHead>
-                    <TableHead><SortButton label="Status" sortKey="status" /></TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredInvestors.map((investor) => (
-                    <InvestorRow
-                      key={investor.id}
-                      investor={investor}
-                      transactions={investorTransactions[investor.id] || []}
-                      onSelectInvestor={handleSelectInvestor}
-                    />
+      
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>All Investors</span>
+                <div className="relative w-64">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search investors..."
+                    className="pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
                   ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                </div>
+              ) : error ? (
+                <div className="text-destructive">{error}</div>
+              ) : filteredInvestors.length === 0 ? (
+                <div className="text-muted-foreground py-8 text-center">
+                  {searchTerm ? "No investors match your search" : "No investors found"}
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead><SortButton label="Investor Name" sortKey="name" /></TableHead>
+                        <TableHead><SortButton label="Initial Investment" sortKey="initialInvestment" /></TableHead>
+                        <TableHead><SortButton label="Current Value" sortKey="currentValue" /></TableHead>
+                        <TableHead><SortButton label="Return %" sortKey="return" /></TableHead>
+                        <TableHead><SortButton label="Status" sortKey="status" /></TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredInvestors.map((investor) => (
+                        <InvestorRow
+                          key={investor.id}
+                          investor={investor}
+                          transactions={investorTransactions[investor.id] || []}
+                          onSelectInvestor={handleSelectInvestor}
+                        />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div>
+          <NavReconciliation onReconciliationComplete={handleReconciliationComplete} />
+        </div>
+      </div>
     </div>
   );
 };

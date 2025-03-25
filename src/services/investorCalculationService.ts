@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { MonthlyNav, Investor, CapitalFlow } from "@/services/dataService";
 
