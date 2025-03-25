@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -80,12 +79,16 @@ const InvestorDetail = () => {
       const latestNav = await getLatestNav();
       
       if (latestNav && allNavHistory.length > 0) {
+        const earliestNavPoint = allNavHistory.sort(
+          (a, b) => new Date(a.month_end_date).getTime() - new Date(b.month_end_date).getTime()
+        )[0];
+        
         const result = calculateInvestorValue(
           investorData,
           transactionData,
           latestNav,
           allNavHistory,
-          0 // Pass 0 as the default since we're only calculating for one investor
+          earliestNavPoint
         );
         
         setCurrentValue(result.currentValue);
