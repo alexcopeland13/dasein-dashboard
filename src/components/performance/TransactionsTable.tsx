@@ -219,8 +219,13 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
+                  href="#" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(Math.max(1, currentPage - 1));
+                  }}
+                  aria-disabled={currentPage === 1}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
                 />
               </PaginationItem>
               
@@ -277,7 +282,11 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
                 return (
                   <PaginationItem key={i}>
                     <PaginationLink
-                      onClick={() => setCurrentPage(pageNumber)}
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(pageNumber);
+                      }}
                       isActive={currentPage === pageNumber}
                     >
                       {pageNumber}
@@ -288,8 +297,13 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
               
               <PaginationItem>
                 <PaginationNext
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(Math.min(totalPages, currentPage + 1));
+                  }}
+                  aria-disabled={currentPage === totalPages}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
                 />
               </PaginationItem>
             </PaginationContent>

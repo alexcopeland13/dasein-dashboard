@@ -11,9 +11,14 @@ interface ReturnHeatMapProps {
   loading: boolean;
 }
 
+interface HeatMapData {
+  years: number[];
+  data: Record<number, Record<number, number | null>>;
+}
+
 const ReturnHeatMap: React.FC<ReturnHeatMapProps> = ({ navData, loading }) => {
   const heatMapData = React.useMemo(() => {
-    if (!navData.length) return [];
+    if (!navData.length) return { years: [], data: {} } as HeatMapData;
     
     const data = formatNavDataForHeatMap(navData);
     
@@ -30,7 +35,7 @@ const ReturnHeatMap: React.FC<ReturnHeatMapProps> = ({ navData, loading }) => {
     // Get unique years and sort them
     const years = Object.keys(grouped).map(Number).sort((a, b) => b - a);
     
-    return { years, data: grouped };
+    return { years, data: grouped } as HeatMapData;
   }, [navData]);
 
   const getColorClass = (value: number | null) => {
@@ -69,7 +74,7 @@ const ReturnHeatMap: React.FC<ReturnHeatMapProps> = ({ navData, loading }) => {
         Monthly Returns Heat Map
       </h2>
       
-      {heatMapData.years?.length > 0 ? (
+      {heatMapData.years.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

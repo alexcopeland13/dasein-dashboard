@@ -21,6 +21,13 @@ interface PerformanceTableProps {
   loading: boolean;
 }
 
+interface FormattedNavData {
+  month: string;
+  navValue: string;
+  monthlyReturn: string;
+  ytdReturn: string;
+}
+
 const PerformanceTable: React.FC<PerformanceTableProps> = ({
   navData,
   loading,
@@ -46,8 +53,8 @@ const PerformanceTable: React.FC<PerformanceTableProps> = ({
   
   // Sort data based on current sort settings
   const sortedData = [...formattedData].sort((a, b) => {
-    let valueA = a[sortColumn as keyof typeof a];
-    let valueB = b[sortColumn as keyof typeof b];
+    let valueA: any = a[sortColumn as keyof FormattedNavData];
+    let valueB: any = b[sortColumn as keyof FormattedNavData];
     
     // Parse percentage values for proper numeric sorting
     if (typeof valueA === 'string' && valueA.endsWith('%')) {

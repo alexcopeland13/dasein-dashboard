@@ -70,7 +70,7 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
         title="Max Drawdown"
         value={
           maxDrawdown
-            ? `${formatPercentage(maxDrawdown.percentage)} (${formatPercentage(maxDrawdown.startDate)} - ${formatPercentage(maxDrawdown.endDate)})`
+            ? `${formatPercentage(maxDrawdown.percentage)} (${maxDrawdown.startDate} - ${maxDrawdown.endDate})`
             : "N/A"
         }
         icon={<TrendingDown size={20} />}
