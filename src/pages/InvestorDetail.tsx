@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -83,7 +84,8 @@ const InvestorDetail = () => {
           investorData,
           transactionData,
           latestNav,
-          allNavHistory
+          allNavHistory,
+          0 // Pass 0 as the default since we're only calculating for one investor
         );
         
         setCurrentValue(result.currentValue);
