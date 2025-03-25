@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import DashboardNav from "@/components/nav/DashboardNav";
 import { 
   BarChart3, 
   Users, 
@@ -11,11 +10,6 @@ import {
   Plus,
   X
 } from "lucide-react";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent
-} from "@/components/ui/chart";
 import {
   LineChart,
   Line,
@@ -36,7 +30,7 @@ import {
 } from "@/services/navService";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import AddNavForm from "@/components/forms/AddNavForm";
+import NavForm from "@/components/forms/NavForm";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
@@ -136,149 +130,140 @@ const Index = () => {
   }));
 
   return (
-    <div className="min-h-screen bg-background">
-      <DashboardNav />
-      
-      <main className="ml-64 p-8 animate-fade-up">
-        <div className="max-w-7xl mx-auto">
-          <header className="mb-8 flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-              <p className="text-gray-400 mt-2">Fund performance and metrics overview</p>
-            </div>
-            <Button 
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-2"
-            >
-              {showAddForm ? <X size={16} /> : <Plus size={16} />}
-              {showAddForm ? "Close" : "Add Monthly NAV"}
-            </Button>
-          </header>
-
-          {showAddForm && (
-            <div className="mb-8">
-              <AddNavForm 
-                onSuccess={() => {
-                  setShowAddForm(false);
-                  fetchData();
-                }} 
-              />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <MetricCard
-              title="Current NAV"
-              value={loading.nav ? null : (currentNav ? formatToMillion(currentNav) : "N/A")}
-              icon={<BarChart3 className="w-6 h-6" />}
-              trend={monthlyReturn}
-              trendLabel="vs last month"
-              loading={loading.nav}
-            />
-            <MetricCard
-              title="YTD Return"
-              value={loading.ytdReturn ? null : (ytdReturn ? `${ytdReturn.toFixed(1)}%` : "N/A")}
-              icon={<TrendingUp className="w-6 h-6" />}
-              trend={ytdReturn}
-              trendLabel="this year"
-              loading={loading.ytdReturn}
-            />
-            <MetricCard
-              title="Total Investors"
-              value={loading.investors ? null : (investorCount !== null ? investorCount : "N/A")}
-              icon={<Users className="w-6 h-6" />}
-              trend={2}
-              trendLabel="new this month"
-              loading={loading.investors}
-            />
+    <div className="p-8 space-y-6 animate-fade-up">
+      <div className="max-w-7xl mx-auto">
+        <header className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+            <p className="text-gray-400 mt-2">Fund performance and metrics overview</p>
           </div>
+          <Button 
+            onClick={() => setShowAddForm(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus size={16} />
+            Add Monthly NAV
+          </Button>
+        </header>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-6 metric-card">
-              <h2 className="text-lg font-semibold mb-4 text-white">NAV Performance</h2>
-              {loading.chart ? (
-                <div className="h-[300px] flex items-center justify-center">
-                  <Skeleton className="h-full w-full" />
-                </div>
-              ) : chartData.length > 0 ? (
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={chartData}
-                      margin={{
-                        top: 5,
-                        right: 30,
-                        left: 20,
-                        bottom: 5,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                      <XAxis 
-                        dataKey="date" 
-                        stroke="rgba(255,255,255,0.5)"
-                        tick={{ fill: 'rgba(255,255,255,0.7)' }}
-                      />
-                      <YAxis 
-                        stroke="rgba(255,255,255,0.5)"
-                        tick={{ fill: 'rgba(255,255,255,0.7)' }}
-                        tickFormatter={(value) => `$${(value / 1000000).toFixed(1)}M`}
-                      />
-                      <Tooltip
-                        formatter={(value: number) => [formatCurrency(value), "NAV"]}
-                        labelFormatter={(label) => `Date: ${label}`}
-                        contentStyle={{ 
-                          backgroundColor: 'rgba(39, 20, 69, 0.9)',
-                          borderColor: 'rgba(151, 222, 244, 0.2)',
-                          color: 'white'
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="value"
-                        stroke="rgb(151, 222, 244)"
-                        strokeWidth={2}
-                        dot={{ fill: 'rgb(151, 222, 244)', strokeWidth: 1, r: 4 }}
-                        activeDot={{ r: 6, fill: 'rgb(178, 247, 245)' }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400">
-                  No NAV data available
-                </div>
-              )}
-            </Card>
-            
-            <Card className="p-6 metric-card">
-              <h2 className="text-lg font-semibold mb-4 text-white">Recent Activity</h2>
-              {loading.activities ? (
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <Skeleton key={i} className="h-[72px] w-full" />
-                  ))}
-                </div>
-              ) : recentActivity.length > 0 ? (
-                <div className="space-y-4">
-                  {recentActivity.map((activity) => (
-                    <ActivityItem
-                      key={activity.id}
-                      type={activity.type as 'contribution' | 'withdrawal'}
-                      amount={activity.amount}
-                      investor={activity.investor_name}
-                      date={activity.date}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="h-[200px] flex items-center justify-center text-gray-400">
-                  No recent activities
-                </div>
-              )}
-            </Card>
-          </div>
+        <NavForm 
+          open={showAddForm} 
+          onOpenChange={setShowAddForm} 
+          onSuccess={fetchData} 
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <MetricCard
+            title="Current NAV"
+            value={loading.nav ? null : (currentNav ? formatToMillion(currentNav) : "N/A")}
+            icon={<BarChart3 className="w-6 h-6" />}
+            trend={monthlyReturn}
+            trendLabel="vs last month"
+            loading={loading.nav}
+          />
+          <MetricCard
+            title="YTD Return"
+            value={loading.ytdReturn ? null : (ytdReturn ? `${ytdReturn.toFixed(1)}%` : "N/A")}
+            icon={<TrendingUp className="w-6 h-6" />}
+            trend={ytdReturn}
+            trendLabel="this year"
+            loading={loading.ytdReturn}
+          />
+          <MetricCard
+            title="Total Investors"
+            value={loading.investors ? null : (investorCount !== null ? investorCount : "N/A")}
+            icon={<Users className="w-6 h-6" />}
+            trend={2}
+            trendLabel="new this month"
+            loading={loading.investors}
+          />
         </div>
-      </main>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="p-6 metric-card">
+            <h2 className="text-lg font-semibold mb-4 text-white">NAV Performance</h2>
+            {loading.chart ? (
+              <div className="h-[300px] flex items-center justify-center">
+                <Skeleton className="h-full w-full" />
+              </div>
+            ) : chartData.length > 0 ? (
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={chartData}
+                    margin={{
+                      top: 5,
+                      right: 30,
+                      left: 20,
+                      bottom: 5,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="rgba(255,255,255,0.5)"
+                      tick={{ fill: 'rgba(255,255,255,0.7)' }}
+                    />
+                    <YAxis 
+                      stroke="rgba(255,255,255,0.5)"
+                      tick={{ fill: 'rgba(255,255,255,0.7)' }}
+                      tickFormatter={(value) => `$${(value / 1000000).toFixed(1)}M`}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => [formatCurrency(value), "NAV"]}
+                      labelFormatter={(label) => `Date: ${label}`}
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(39, 20, 69, 0.9)',
+                        borderColor: 'rgba(151, 222, 244, 0.2)',
+                        color: 'white'
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="rgb(151, 222, 244)"
+                      strokeWidth={2}
+                      dot={{ fill: 'rgb(151, 222, 244)', strokeWidth: 1, r: 4 }}
+                      activeDot={{ r: 6, fill: 'rgb(178, 247, 245)' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-gray-400">
+                No NAV data available
+              </div>
+            )}
+          </Card>
+          
+          <Card className="p-6 metric-card">
+            <h2 className="text-lg font-semibold mb-4 text-white">Recent Activity</h2>
+            {loading.activities ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} className="h-[72px] w-full" />
+                ))}
+              </div>
+            ) : recentActivity.length > 0 ? (
+              <div className="space-y-4">
+                {recentActivity.map((activity) => (
+                  <ActivityItem
+                    key={activity.id}
+                    type={activity.type as 'contribution' | 'withdrawal'}
+                    amount={activity.amount}
+                    investor={activity.investor_name}
+                    date={activity.date}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-gray-400">
+                No recent activities
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };

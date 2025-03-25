@@ -1,70 +1,193 @@
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { 
+  Table, 
+  TableBody, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Users, Plus, Search, ArrowUpDown } from "lucide-react";
+import { InvestorRow } from "@/components/investors/InvestorRow";
+import InvestorForm from "@/components/investors/InvestorForm";
+import { 
+  calculateInvestorValues, 
+  getInvestorTransactions 
+} from "@/services/navService";
+import { useToast } from "@/hooks/use-toast";
 
-type Investor = {
-  id: string;
-  name: string;
-};
+type SortKey = 'name' | 'initialInvestment' | 'currentValue' | 'return' | 'status';
+type SortDirection = 'asc' | 'desc';
 
 const InvestorsPage = () => {
-  const [investors, setInvestors] = useState<Investor[]>([]);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [investors, setInvestors] = useState<{
+    id: string;
+    name: string;
+    initialInvestment: number;
+    currentValue: number;
+    return: number;
+    status: string;
+    mgmtFeeRate: number;
+    perfFeeRate: number;
+    startDate: string;
+    transactions?: any[];
+  }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState<{key: SortKey; direction: SortDirection}>({
+    key: 'name',
+    direction: 'asc'
+  });
+  const [expandedInvestors, setExpandedInvestors] = useState<Record<string, boolean>>({});
+  const [investorTransactions, setInvestorTransactions] = useState<Record<string, any[]>>({});
+
+  const fetchInvestors = async () => {
+    setIsLoading(true);
+    try {
+      const investorValues = await calculateInvestorValues();
+      setInvestors(investorValues);
+
+      // Fetch transactions for all investors
+      const transactions: Record<string, any[]> = {};
+      for (const investor of investorValues) {
+        const investorTransactions = await getInvestorTransactions(investor.id);
+        transactions[investor.id] = investorTransactions;
+      }
+      setInvestorTransactions(transactions);
+    } catch (err) {
+      console.error("Error fetching investors:", err);
+      setError("Failed to load investors");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchInvestors = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("investors")
-          .select("id, name")
-          .order("name");
-
-        if (error) throw error;
-
-        setInvestors(data || []);
-      } catch (err) {
-        console.error("Error fetching investors:", err);
-        setError("Failed to load investors");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchInvestors();
   }, []);
 
+  const handleSort = (key: SortKey) => {
+    setSort(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedInvestors = [...investors].sort((a, b) => {
+    const { key, direction } = sort;
+    const factor = direction === 'asc' ? 1 : -1;
+    
+    if (key === 'name') {
+      return a.name.localeCompare(b.name) * factor;
+    } else if (key === 'status') {
+      return a.status.localeCompare(b.status) * factor;
+    } else {
+      // For numerical values
+      return ((a[key] as number) - (b[key] as number)) * factor;
+    }
+  });
+
+  const filteredInvestors = sortedInvestors.filter(investor => 
+    investor.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleSelectInvestor = (id: string) => {
+    navigate(`/investors/${id}`);
+  };
+
+  const SortButton = ({ label, sortKey }: { label: string; sortKey: SortKey }) => (
+    <Button 
+      variant="ghost" 
+      size="sm" 
+      onClick={() => handleSort(sortKey)}
+      className="hover:bg-white/10"
+    >
+      {label}
+      <ArrowUpDown className="ml-2 h-4 w-4" />
+    </Button>
+  );
+
   return (
     <div className="p-8 space-y-6 animate-fade-up">
-      <div className="flex items-center space-x-2">
-        <Users className="w-6 h-6 text-accent" />
-        <h1 className="text-2xl font-semibold">Investors</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Users className="w-6 h-6 text-accent" />
+          <h1 className="text-2xl font-semibold">Investors</h1>
+        </div>
+        <Button onClick={() => setShowAddForm(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Investor
+        </Button>
       </div>
+
+      <InvestorForm 
+        open={showAddForm} 
+        onOpenChange={setShowAddForm} 
+        onSuccess={fetchInvestors} 
+      />
 
       <Card>
         <CardHeader>
-          <CardTitle>All Investors</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>All Investors</span>
+            <div className="relative w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search investors..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-muted-foreground">Loading investors...</div>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
           ) : error ? (
             <div className="text-destructive">{error}</div>
-          ) : investors.length === 0 ? (
-            <div className="text-muted-foreground">No investors found</div>
+          ) : filteredInvestors.length === 0 ? (
+            <div className="text-muted-foreground py-8 text-center">
+              {searchTerm ? "No investors match your search" : "No investors found"}
+            </div>
           ) : (
-            <ul className="space-y-2">
-              {investors.map((investor) => (
-                <li
-                  key={investor.id}
-                  className="p-3 rounded-lg activity-item hover:bg-white/5 transition-colors"
-                >
-                  {investor.name}
-                </li>
-              ))}
-            </ul>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead><SortButton label="Investor Name" sortKey="name" /></TableHead>
+                    <TableHead><SortButton label="Initial Investment" sortKey="initialInvestment" /></TableHead>
+                    <TableHead><SortButton label="Current Value" sortKey="currentValue" /></TableHead>
+                    <TableHead><SortButton label="Return %" sortKey="return" /></TableHead>
+                    <TableHead><SortButton label="Status" sortKey="status" /></TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredInvestors.map((investor) => (
+                    <InvestorRow
+                      key={investor.id}
+                      investor={investor}
+                      transactions={investorTransactions[investor.id] || []}
+                      onSelectInvestor={handleSelectInvestor}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
