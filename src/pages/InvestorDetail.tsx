@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -60,7 +59,6 @@ const InvestorDetail = () => {
     
     setLoading(true);
     try {
-      // Fetch investor details
       const investorData = await getInvestorById(id);
       if (!investorData) {
         toast({
@@ -73,18 +71,14 @@ const InvestorDetail = () => {
       }
       setInvestor(investorData);
       
-      // Fetch transactions
       const transactionData = await getInvestorTransactions(id);
       setTransactions(transactionData);
       
-      // Get all NAV history
       const allNavHistory = await getAllNavData();
       
-      // Get latest NAV
       const latestNav = await getLatestNav();
       
       if (latestNav && allNavHistory.length > 0) {
-        // Import the calculateInvestorValue function from our new service
         const result = calculateInvestorValue(
           investorData,
           transactionData,
@@ -95,7 +89,6 @@ const InvestorDetail = () => {
         setCurrentValue(result.currentValue);
         setReturnPercentage(result.returnPercentage);
         
-        // Calculate historical balances for chart
         setHistoricalBalances(
           calculateHistoricalBalances(
             investorData,
@@ -116,18 +109,15 @@ const InvestorDetail = () => {
     }
   };
 
-  // Calculate historical balances over time
   const calculateHistoricalBalances = (
     investor: any,
     transactions: any[],
     navHistory: any[]
   ) => {
-    // Sort transactions by date (oldest first)
     const sortedTransactions = [...transactions].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
     
-    // Sort NAV points by date (oldest first)
     const sortedNavHistory = [...navHistory].sort(
       (a, b) => new Date(a.month_end_date).getTime() - new Date(b.month_end_date).getTime()
     );
@@ -136,28 +126,22 @@ const InvestorDetail = () => {
     let currentOwnership = 0;
     let lastProcessedNavIndex = -1;
     
-    // Find initial NAV point (closest to investor start date)
     const startDate = new Date(investor.start_date);
     for (let i = 0; i < sortedNavHistory.length; i++) {
       const navDate = new Date(sortedNavHistory[i].month_end_date);
       if (navDate >= startDate) {
-        // Found first NAV point after investor start
         if (i > 0) {
-          // Use the previous NAV point
           lastProcessedNavIndex = i - 1;
           currentOwnership = Number(investor.initial_investment) / Number(sortedNavHistory[lastProcessedNavIndex].total_nav);
           
-          // Add initial balance point
           balanceHistory.push({
             date: format(new Date(sortedNavHistory[lastProcessedNavIndex].month_end_date), 'MMM yyyy'),
             balance: Number(investor.initial_investment)
           });
         } else {
-          // Use the first available NAV point
           lastProcessedNavIndex = 0;
           currentOwnership = Number(investor.initial_investment) / Number(sortedNavHistory[0].total_nav);
           
-          // Add initial balance point
           balanceHistory.push({
             date: format(new Date(sortedNavHistory[0].month_end_date), 'MMM yyyy'),
             balance: Number(investor.initial_investment)
@@ -167,26 +151,22 @@ const InvestorDetail = () => {
       }
     }
     
-    // If no suitable NAV point found, use the first one
     if (lastProcessedNavIndex === -1 && sortedNavHistory.length > 0) {
       lastProcessedNavIndex = 0;
       currentOwnership = Number(investor.initial_investment) / Number(sortedNavHistory[0].total_nav);
       
-      // Add initial balance point
       balanceHistory.push({
         date: format(new Date(sortedNavHistory[0].month_end_date), 'MMM yyyy'),
         balance: Number(investor.initial_investment)
       });
     }
     
-    // Process each NAV point and transaction
     let transactionIndex = 0;
     
     for (let i = lastProcessedNavIndex + 1; i < sortedNavHistory.length; i++) {
       const navPoint = sortedNavHistory[i];
       const navDate = new Date(navPoint.month_end_date);
       
-      // Process all transactions that occurred before this NAV point
       while (
         transactionIndex < sortedTransactions.length && 
         new Date(sortedTransactions[transactionIndex].date) <= navDate
@@ -196,11 +176,9 @@ const InvestorDetail = () => {
         const fundValueAtTransaction = Number(prevNavPoint.total_nav);
         
         if (transaction.type === "contribution") {
-          // Add ownership from contribution
           const additionalOwnership = Number(transaction.amount) / fundValueAtTransaction;
           currentOwnership += additionalOwnership;
         } else if (transaction.type === "withdrawal") {
-          // Reduce ownership from withdrawal
           const currentValue = fundValueAtTransaction * currentOwnership;
           const withdrawalPercentage = Number(transaction.amount) / currentValue;
           currentOwnership -= currentOwnership * withdrawalPercentage;
@@ -209,12 +187,10 @@ const InvestorDetail = () => {
         transactionIndex++;
       }
       
-      // Calculate balance at this NAV point
       const balance = investor.status === "closed" && i === sortedNavHistory.length - 1
-        ? 0  // If account is closed, final balance is 0
+        ? 0
         : Number(navPoint.total_nav) * currentOwnership;
       
-      // Add to balance history
       balanceHistory.push({
         date: format(navDate, 'MMM yyyy'),
         balance: balance
@@ -260,6 +236,10 @@ const InvestorDetail = () => {
       </div>
     );
   }
+
+  const sortedTransactions = [...transactions].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 
   return (
     <div className="p-8 space-y-6 animate-fade-up">
