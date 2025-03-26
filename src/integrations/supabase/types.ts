@@ -87,7 +87,9 @@ export type Database = {
           id: number
           management_fees: number | null
           month_end_date: string
+          month_start_date: string | null
           monthly_return: number | null
+          start_nav: number | null
           total_nav: number
         }
         Insert: {
@@ -96,7 +98,9 @@ export type Database = {
           id?: number
           management_fees?: number | null
           month_end_date: string
+          month_start_date?: string | null
           monthly_return?: number | null
+          start_nav?: number | null
           total_nav: number
         }
         Update: {
@@ -105,7 +109,9 @@ export type Database = {
           id?: number
           management_fees?: number | null
           month_end_date?: string
+          month_start_date?: string | null
           monthly_return?: number | null
+          start_nav?: number | null
           total_nav?: number
         }
         Relationships: []

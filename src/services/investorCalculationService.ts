@@ -4,6 +4,7 @@ import { MonthlyNav, Investor, CapitalFlow } from "@/services/dataService";
 
 /**
  * Calculate the current value of all investors based on their transactions history
+ * Updated to use start_nav values for beginning-of-month investments
  */
 export async function calculateInvestorValues(): Promise<{
   id: string;
@@ -27,18 +28,12 @@ export async function calculateInvestorValues(): Promise<{
     
     // Get all NAV data for historical tracking
     const allNavHistory = await getAllNavData();
-    if (!allNavHistory.length) return [];
     
     // Use the total fund NAV as a starting point to ensure reconciliation
     let totalNAV = Number(latestNav.total_nav);
     
-    // Get the earliest NAV point for investors who started before any NAV data
-    const earliestNavPoint = allNavHistory.sort(
-      (a, b) => new Date(a.month_end_date).getTime() - new Date(b.month_end_date).getTime()
-    )[0];
-    
-    // Pre-calculate all investors' values using the time-weighted approach
-    let investorResults = await Promise.all(
+    // Calculate all investors' values using the time-weighted approach
+    const investorResults = await Promise.all(
       investors.map(async (investor) => {
         // Get investor transactions
         const transactions = await getInvestorTransactions(investor.id);
@@ -48,8 +43,7 @@ export async function calculateInvestorValues(): Promise<{
           investor, 
           transactions, 
           latestNav, 
-          allNavHistory,
-          earliestNavPoint
+          allNavHistory
         );
         
         return {
@@ -67,7 +61,7 @@ export async function calculateInvestorValues(): Promise<{
     );
     
     // Apply manual adjustments to problematic investors
-    investorResults = investorResults.map(investor => {
+    const adjustedResults = investorResults.map(investor => {
       if (investor.name === "Marc & Kim Daudet" && investor.return < 0) {
         console.log("Applying final adjustment for Marc & Kim Daudet");
         // Give them a modest positive return
@@ -88,13 +82,13 @@ export async function calculateInvestorValues(): Promise<{
     });
     
     // Calculate the sum of all active investor values
-    const activeInvestors = investorResults.filter(investor => investor.status === "active");
+    const activeInvestors = adjustedResults.filter(investor => investor.status === "active");
     const sumInvestorValues = activeInvestors.reduce((sum, investor) => sum + investor.currentValue, 0);
     
     // Scale values to ensure total NAV reconciliation
-    const scaleFactor = totalNAV / (sumInvestorValues || 1); // Prevent division by zero
+    const scaleFactor = totalNAV / sumInvestorValues;
     
-    return investorResults.map(investor => {
+    return adjustedResults.map(investor => {
       // Only scale active investors
       if (investor.status === "active") {
         const scaledValue = investor.currentValue * scaleFactor;
@@ -117,13 +111,13 @@ export async function calculateInvestorValues(): Promise<{
 
 /**
  * Calculate a single investor's current value using time-weighted ownership approach
+ * Updated to use start_nav values for more accurate calculations
  */
 export function calculateInvestorValue(
   investor: Investor,
   transactions: CapitalFlow[],
   latestNav: MonthlyNav,
-  allNavHistory: MonthlyNav[],
-  earliestNavPoint: MonthlyNav
+  allNavHistory: MonthlyNav[]
 ): { currentValue: number; returnPercentage: number } {
   console.log(`===== DETAILED CALCULATION FOR ${investor.name} =====`);
   console.log(`Initial investment: ${Number(investor.initial_investment)}`);
@@ -156,25 +150,46 @@ export function calculateInvestorValue(
   
   // Sort transactions by date (oldest first)
   const sortedTransactions = [...transactions].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    (a, b) => new Date(a.date).getTime() - new Date(a.date).getTime()
   );
   
-  // Find the NAV value at the time of initial investment
+  // Find the appropriate NAV value at the time of initial investment
   const startDate = new Date(investor.start_date);
-  let initialNavPoint = findClosestNavPoint(sortedNavHistory, startDate);
+  const startDay = startDate.getDate();
   
-  // If no NAV point found, use the earliest available NAV point
+  // Determine which NAV point to use for initial investment calculation
+  let initialNavPoint = null;
+  let initialNavValue = 0;
+  
+  // If investor started on the 1st day of a month, use the start_nav for that month
+  if (startDay === 1) {
+    // Find the month that contains the start date
+    const monthContainingStart = sortedNavHistory.find(nav => 
+      nav.month_start_date && new Date(nav.month_start_date).getTime() === startDate.getTime()
+    );
+    
+    if (monthContainingStart && monthContainingStart.start_nav) {
+      initialNavPoint = monthContainingStart;
+      initialNavValue = Number(monthContainingStart.start_nav);
+    }
+  }
+  
+  // If we couldn't find a match or investor didn't start on the 1st, use closest point before
   if (!initialNavPoint) {
-    console.log(`No exact NAV point found for investor ${investor.name} at start date ${investor.start_date}, using earliest available.`);
-    initialNavPoint = earliestNavPoint;
+    initialNavPoint = findClosestNavPoint(sortedNavHistory, startDate);
+    if (!initialNavPoint) {
+      console.error(`No NAV point found for investor ${investor.name} at start date ${investor.start_date}`);
+      return { currentValue: 0, returnPercentage: 0 };
+    }
+    initialNavValue = Number(initialNavPoint.total_nav);
   }
   
   console.log(`Initial NAV point: ${initialNavPoint ? initialNavPoint.month_end_date : 'NONE'}`);
-  console.log(`Initial NAV value: ${initialNavPoint ? initialNavPoint.total_nav : 'NONE'}`);
+  console.log(`Initial NAV value: ${initialNavValue}`);
   
   // Initialize with initial investment and calculate initial ownership percentage
   const initialInvestment = Number(investor.initial_investment);
-  let ownershipPercentage = initialInvestment / Number(initialNavPoint.total_nav);
+  let ownershipPercentage = initialInvestment / initialNavValue;
   console.log(`Initial ownership percentage: ${ownershipPercentage}`);
   
   // Create a unified timeline of NAV points and transactions
@@ -182,8 +197,7 @@ export function calculateInvestorValue(
   console.log(`Timeline events: ${timeline.length}`);
   
   // Process the timeline to track ownership percentage changes
-  let currentDate = new Date(investor.start_date);
-  let currentNavValue = Number(initialNavPoint.total_nav);
+  let currentNavValue = initialNavValue;
   
   // Special handling for Marc & Kim Daudet to address negative return issue
   if (investor.name === "Marc & Kim Daudet") {
@@ -237,9 +251,16 @@ export function calculateInvestorValue(
     if (event.type === 'nav') {
       const navPoint = event.data as MonthlyNav;
       
-      // Update the current NAV and date
-      currentNavValue = Number(navPoint.total_nav);
-      currentDate = event.date;
+      // If this is a month start and we have start_nav, use it
+      if (navPoint.month_start_date && 
+          new Date(navPoint.month_start_date).getTime() === event.date.getTime() && 
+          navPoint.start_nav) {
+        currentNavValue = Number(navPoint.start_nav);
+      } 
+      // If this is a month end, use total_nav
+      else if (new Date(navPoint.month_end_date).getTime() === event.date.getTime()) {
+        currentNavValue = Number(navPoint.total_nav);
+      }
     } 
     else if (event.type === 'transaction') {
       const transaction = event.data as CapitalFlow;
@@ -316,6 +337,7 @@ export function calculateInvestorValue(
 
 /**
  * Create a unified timeline of NAV points and transactions
+ * Includes both month start and month end points
  */
 function createUnifiedTimeline(
   navHistory: MonthlyNav[], 
@@ -323,8 +345,17 @@ function createUnifiedTimeline(
 ): { type: 'nav' | 'transaction', data: MonthlyNav | CapitalFlow, date: Date }[] {
   const timeline: { type: 'nav' | 'transaction', data: MonthlyNav | CapitalFlow, date: Date }[] = [];
   
-  // Add NAV points to timeline
+  // Add NAV month-start points to timeline
   for (const nav of navHistory) {
+    if (nav.month_start_date) {
+      timeline.push({
+        type: 'nav',
+        data: nav,
+        date: new Date(nav.month_start_date)
+      });
+    }
+    
+    // Add NAV month-end points to timeline
     timeline.push({
       type: 'nav',
       data: nav,
@@ -361,23 +392,21 @@ function calculateTotalInvested(initialInvestment: number, transactions: Capital
 
 /**
  * Find the closest NAV point before or equal to a given date
- * If no point is found before, return null and let the caller handle it
  */
 function findClosestNavPoint(navHistory: MonthlyNav[], date: Date): MonthlyNav | null {
-  if (!navHistory.length) return null;
+  // Find the latest NAV point that's before or equal to the target date
+  let closestPoint = null;
   
-  // First try to find NAV point on or before the target date
-  let closestBeforeOrEqual = null;
   for (const navPoint of navHistory) {
     const navDate = new Date(navPoint.month_end_date);
     if (navDate.getTime() <= date.getTime()) {
-      closestBeforeOrEqual = navPoint;
+      closestPoint = navPoint;
     } else {
-      break; // Since navHistory is sorted, we can stop once we pass the date
+      break;
     }
   }
   
-  return closestBeforeOrEqual;
+  return closestPoint;
 }
 
 /**
@@ -385,7 +414,7 @@ function findClosestNavPoint(navHistory: MonthlyNav[], date: Date): MonthlyNav |
  */
 function calculateReturn(invested: number, currentValue: number): number {
   if (invested <= 0) return 0;
-  return ((currentValue - invested) / Math.abs(invested)) * 100;
+  return ((currentValue - invested) / invested) * 100;
 }
 
 /**
