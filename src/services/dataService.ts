@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -184,16 +183,19 @@ export async function addCapitalFlow(data: {
  * Fetch all investors
  */
 export async function getAllInvestors(): Promise<Investor[]> {
+  const timestamp = new Date().getTime(); // Add timestamp to bust cache
   const { data, error } = await supabase
     .from("investors")
     .select("*")
-    .order("name", { ascending: true });
+    .order("name", { ascending: true })
+    .headers({ 'X-Cache-Bust': `${timestamp}` });
 
   if (error) {
     console.error("Error fetching investors:", error);
     return [];
   }
 
+  console.log("Fetched all investors:", data); // Add logging to debug
   return data || [];
 }
 
@@ -201,17 +203,20 @@ export async function getAllInvestors(): Promise<Investor[]> {
  * Fetch a specific investor by ID
  */
 export async function getInvestorById(id: string): Promise<Investor | null> {
+  const timestamp = new Date().getTime(); // Add timestamp to bust cache
   const { data, error } = await supabase
     .from("investors")
     .select("*")
     .eq("id", id)
-    .single();
+    .single()
+    .headers({ 'X-Cache-Bust': `${timestamp}` });
 
   if (error) {
     console.error(`Error fetching investor ${id}:`, error);
     return null;
   }
 
+  console.log("Fetched investor data:", data); // Add logging to debug
   return data;
 }
 
@@ -219,17 +224,20 @@ export async function getInvestorById(id: string): Promise<Investor | null> {
  * Fetch transactions for a specific investor
  */
 export async function getInvestorTransactions(investorId: string): Promise<CapitalFlow[]> {
+  const timestamp = new Date().getTime(); // Add timestamp to bust cache
   const { data, error } = await supabase
     .from("capital_flows")
     .select("*")
     .eq("investor_id", investorId)
-    .order("date", { ascending: false });
+    .order("date", { ascending: false })
+    .headers({ 'X-Cache-Bust': `${timestamp}` });
 
   if (error) {
     console.error(`Error fetching transactions for investor ${investorId}:`, error);
     return [];
   }
-
+  
+  console.log("Fetched investor transactions:", data); // Add logging to debug
   return data || [];
 }
 

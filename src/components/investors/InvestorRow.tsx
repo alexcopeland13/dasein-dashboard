@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { ChevronDown, ChevronUp, DollarSign, Calendar, Percent } from "lucide-react";
 import { format } from "date-fns";
@@ -32,6 +31,7 @@ const formatCurrency = (value: number) => {
 };
 
 export function InvestorRow({ investor, transactions, onSelectInvestor }: InvestorRowProps) {
+  console.log(`Rendering InvestorRow for investor: ${investor.name}, startDate: ${investor.startDate}`);
   const [expanded, setExpanded] = useState(false);
 
   return (

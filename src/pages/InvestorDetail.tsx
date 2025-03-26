@@ -1,16 +1,16 @@
-
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatDate, formatPercentage } from "@/utils/formatters";
 import { getInvestorById, getInvestorTransactions, getLatestNav, getAllNavData } from "@/services/dataService";
 import { calculateInvestorValue } from "@/services/investorCalculationService";
 import { Investor, CapitalFlow, MonthlyNav } from "@/services/dataService";
+import { useToast } from "@/hooks/use-toast";
 
 const InvestorDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,39 +19,64 @@ const InvestorDetail = () => {
   const [latestNav, setLatestNav] = useState<MonthlyNav | null>(null);
   const [allNavHistory, setAllNavHistory] = useState<MonthlyNav[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        if (!id) return;
-        
-        // Fetch investor data
-        const investorData = await getInvestorById(id);
-        setInvestor(investorData);
-        
-        // Fetch transactions
-        const transactionData = await getInvestorTransactions(id);
-        setTransactions(transactionData);
-        
-        // Fetch latest NAV
-        const navData = await getLatestNav();
-        setLatestNav(navData);
-        
-        // Fetch all NAV history
-        const navHistory = await getAllNavData();
-        setAllNavHistory(navHistory);
-      } catch (error) {
-        console.error("Error fetching investor data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchData = async (forceRefresh = false) => {
+    setLoading(true);
+    if (forceRefresh) {
+      setRefreshing(true);
+    }
     
+    try {
+      if (!id) return;
+      
+      // Fetch investor data
+      const investorData = await getInvestorById(id);
+      setInvestor(investorData);
+      
+      // Fetch transactions
+      const transactionData = await getInvestorTransactions(id);
+      setTransactions(transactionData);
+      
+      // Fetch latest NAV
+      const navData = await getLatestNav();
+      setLatestNav(navData);
+      
+      // Fetch all NAV history
+      const navHistory = await getAllNavData();
+      setAllNavHistory(navHistory);
+
+      if (forceRefresh) {
+        toast({
+          title: "Data refreshed",
+          description: "The latest data has been fetched from the database.",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching investor data:", error);
+      if (forceRefresh) {
+        toast({
+          title: "Refresh failed",
+          description: "There was an error refreshing the data.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+  
+  useEffect(() => {
     fetchData();
   }, [id]);
+  
+  const handleRefresh = () => {
+    fetchData(true);
+  };
   
   const calculateResult = (investorData: Investor, transactionData: CapitalFlow[]) => {
     if (!investorData || !latestNav || !allNavHistory) {
@@ -123,7 +148,6 @@ const InvestorDetail = () => {
   
   const { currentValue, returnPercentage } = calculateResult(investor, transactions);
   
-  // Calculate total contributions and withdrawals
   const totalContributions = transactions
     .filter(t => t.type === 'contribution')
     .reduce((sum, t) => sum + Number(t.amount), Number(investor.initial_investment));
@@ -149,10 +173,21 @@ const InvestorDetail = () => {
           </span>
         </div>
         
-        <Button onClick={() => setShowAddTransaction(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Transaction
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh} 
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh Data'}
+          </Button>
+          <Button onClick={() => setShowAddTransaction(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Transaction
+          </Button>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
