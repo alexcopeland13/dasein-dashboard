@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -9,6 +10,7 @@ export type Investor = Tables<"investors">;
  * Fetch the latest NAV entry from the database
  */
 export async function getLatestNav(): Promise<MonthlyNav | null> {
+  const timestamp = new Date().getTime(); // Add timestamp to bust cache
   const { data, error } = await supabase
     .from("monthly_nav")
     .select("*")
@@ -51,6 +53,7 @@ export async function getYearStartNav(year: number): Promise<MonthlyNav | null> 
  * Fetch all NAV data, ordered by date
  */
 export async function getAllNavData(): Promise<MonthlyNav[]> {
+  const timestamp = new Date().getTime(); // Add timestamp to bust cache
   const { data, error } = await supabase
     .from("monthly_nav")
     .select("*")
@@ -87,6 +90,7 @@ export async function getPreviousMonthReturn(): Promise<number | null> {
  * Fetch recent capital flows
  */
 export async function getRecentActivity(limit: number = 5): Promise<CapitalFlow[]> {
+  const timestamp = new Date().getTime(); // Add timestamp to bust cache
   const { data, error } = await supabase
     .from("capital_flows")
     .select("*")
@@ -105,6 +109,7 @@ export async function getRecentActivity(limit: number = 5): Promise<CapitalFlow[
  * Fetch all capital flows
  */
 export async function getAllCapitalFlows(): Promise<CapitalFlow[]> {
+  const timestamp = new Date().getTime(); // Add timestamp to bust cache
   const { data, error } = await supabase
     .from("capital_flows")
     .select("*")
@@ -122,6 +127,7 @@ export async function getAllCapitalFlows(): Promise<CapitalFlow[]> {
  * Count active investors
  */
 export async function getActiveInvestorsCount(): Promise<number> {
+  const timestamp = new Date().getTime(); // Add timestamp to bust cache
   const { count, error } = await supabase
     .from("investors")
     .select("*", { count: "exact", head: true })
@@ -187,8 +193,7 @@ export async function getAllInvestors(): Promise<Investor[]> {
   const { data, error } = await supabase
     .from("investors")
     .select("*")
-    .order("name", { ascending: true })
-    .headers({ 'X-Cache-Bust': `${timestamp}` });
+    .order("name", { ascending: true });
 
   if (error) {
     console.error("Error fetching investors:", error);
@@ -208,8 +213,7 @@ export async function getInvestorById(id: string): Promise<Investor | null> {
     .from("investors")
     .select("*")
     .eq("id", id)
-    .single()
-    .headers({ 'X-Cache-Bust': `${timestamp}` });
+    .single();
 
   if (error) {
     console.error(`Error fetching investor ${id}:`, error);
@@ -229,8 +233,7 @@ export async function getInvestorTransactions(investorId: string): Promise<Capit
     .from("capital_flows")
     .select("*")
     .eq("investor_id", investorId)
-    .order("date", { ascending: false })
-    .headers({ 'X-Cache-Bust': `${timestamp}` });
+    .order("date", { ascending: false });
 
   if (error) {
     console.error(`Error fetching transactions for investor ${investorId}:`, error);
