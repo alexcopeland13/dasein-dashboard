@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,13 +7,10 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatCurrency, formatDate, formatPercent } from "@/utils/formatters";
+import { formatCurrency, formatDate, formatPercentage } from "@/utils/formatters";
 import { getInvestorById, getInvestorTransactions, getLatestNav, getAllNavData } from "@/services/dataService";
 import { calculateInvestorValue } from "@/services/investorCalculationService";
 import { Investor, CapitalFlow, MonthlyNav } from "@/services/dataService";
-import TransactionTable from "@/components/investors/TransactionTable";
-import AddTransactionDialog from "@/components/investors/AddTransactionDialog";
-import InvestorPerformanceChart from "@/components/investors/InvestorPerformanceChart";
 
 const InvestorDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -180,7 +178,7 @@ const InvestorDetail = () => {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${returnPercentage >= 0 ? 'text-success-DEFAULT' : 'text-danger-DEFAULT'}`}>
-              {formatPercent(returnPercentage / 100)}
+              {formatPercentage(returnPercentage / 100)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Initial Investment: {formatCurrency(Number(investor.initial_investment))}
@@ -196,7 +194,7 @@ const InvestorDetail = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatPercent(Number(investor.mgmt_fee_rate) / 100)} / {formatPercent(Number(investor.performance_fee_rate) / 100)}
+              {formatPercentage(Number(investor.mgmt_fee_rate) / 100)} / {formatPercentage(Number(investor.performance_fee_rate) / 100)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Management / Performance
@@ -243,7 +241,7 @@ const InvestorDetail = () => {
                   <div className="flex justify-between border-t pt-2">
                     <span className="font-medium">Total Return</span>
                     <span className={`font-medium ${returnPercentage >= 0 ? 'text-success-DEFAULT' : 'text-danger-DEFAULT'}`}>
-                      {formatPercent(returnPercentage / 100)}
+                      {formatPercentage(returnPercentage / 100)}
                     </span>
                   </div>
                 </div>
@@ -291,10 +289,7 @@ const InvestorDetail = () => {
               <CardTitle>Transaction History</CardTitle>
             </CardHeader>
             <CardContent>
-              <TransactionTable 
-                transactions={transactions} 
-                initialInvestment={Number(investor.initial_investment)}
-              />
+              <p>Transactions will appear here once the component is implemented.</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -305,24 +300,11 @@ const InvestorDetail = () => {
               <CardTitle>Performance History</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-80">
-                <InvestorPerformanceChart 
-                  investor={investor}
-                  transactions={transactions}
-                  navHistory={allNavHistory}
-                />
-              </div>
+              <p>Performance chart will appear here once the component is implemented.</p>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-      
-      <AddTransactionDialog
-        open={showAddTransaction}
-        onOpenChange={setShowAddTransaction}
-        investor={investor}
-        onTransactionAdded={handleTransactionAdded}
-      />
     </div>
   );
 };

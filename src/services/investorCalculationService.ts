@@ -60,35 +60,14 @@ export async function calculateInvestorValues(): Promise<{
       })
     );
     
-    // Apply manual adjustments to problematic investors
-    const adjustedResults = investorResults.map(investor => {
-      if (investor.name === "Marc & Kim Daudet" && investor.return < 0) {
-        console.log("Applying final adjustment for Marc & Kim Daudet");
-        // Give them a modest positive return
-        const adjustedReturn = 10; // 10%
-        const adjustedValue = investor.initialInvestment * (1 + adjustedReturn/100);
-        return { ...investor, currentValue: adjustedValue, return: adjustedReturn };
-      }
-      
-      if (investor.name === "Mitchell Pantelides" && investor.return < 0) {
-        console.log("Applying final adjustment for Mitchell Pantelides");
-        // Small positive return since recent investment
-        const adjustedReturn = 5; // 5%
-        const adjustedValue = investor.initialInvestment * (1 + adjustedReturn/100);
-        return { ...investor, currentValue: adjustedValue, return: adjustedReturn };
-      }
-      
-      return investor;
-    });
-    
     // Calculate the sum of all active investor values
-    const activeInvestors = adjustedResults.filter(investor => investor.status === "active");
+    const activeInvestors = investorResults.filter(investor => investor.status === "active");
     const sumInvestorValues = activeInvestors.reduce((sum, investor) => sum + investor.currentValue, 0);
     
     // Scale values to ensure total NAV reconciliation
     const scaleFactor = totalNAV / sumInvestorValues;
     
-    return adjustedResults.map(investor => {
+    return investorResults.map(investor => {
       // Only scale active investors
       if (investor.status === "active") {
         const scaledValue = investor.currentValue * scaleFactor;
@@ -119,11 +98,6 @@ export function calculateInvestorValue(
   latestNav: MonthlyNav,
   allNavHistory: MonthlyNav[]
 ): { currentValue: number; returnPercentage: number } {
-  console.log(`===== DETAILED CALCULATION FOR ${investor.name} =====`);
-  console.log(`Initial investment: ${Number(investor.initial_investment)}`);
-  console.log(`Start date: ${investor.start_date}`);
-  console.log(`Status: ${investor.status}`);
-  
   // Special case: If investor status is "closed", return 0 value
   if (investor.status === "closed") {
     // Find the last withdrawal transaction
@@ -184,65 +158,15 @@ export function calculateInvestorValue(
     initialNavValue = Number(initialNavPoint.total_nav);
   }
   
-  console.log(`Initial NAV point: ${initialNavPoint ? initialNavPoint.month_end_date : 'NONE'}`);
-  console.log(`Initial NAV value: ${initialNavValue}`);
-  
   // Initialize with initial investment and calculate initial ownership percentage
   const initialInvestment = Number(investor.initial_investment);
   let ownershipPercentage = initialInvestment / initialNavValue;
-  console.log(`Initial ownership percentage: ${ownershipPercentage}`);
   
   // Create a unified timeline of NAV points and transactions
   const timeline = createUnifiedTimeline(sortedNavHistory, sortedTransactions);
-  console.log(`Timeline events: ${timeline.length}`);
   
   // Process the timeline to track ownership percentage changes
   let currentNavValue = initialNavValue;
-  
-  // Special handling for Marc & Kim Daudet to address negative return issue
-  if (investor.name === "Marc & Kim Daudet") {
-    console.log("Applying enhanced handling for Marc & Kim Daudet");
-    // Check if any NAV data exists after their start date but before their first transaction
-    const firstTransaction = sortedTransactions[0];
-    if (firstTransaction) {
-      const firstTransactionDate = new Date(firstTransaction.date);
-      const relevantNavPoints = sortedNavHistory.filter(nav => 
-        new Date(nav.month_end_date) >= startDate && 
-        new Date(nav.month_end_date) <= firstTransactionDate
-      );
-      
-      if (relevantNavPoints.length > 0) {
-        console.log(`Found ${relevantNavPoints.length} NAV points between start date and first transaction`);
-        // Use the last NAV point before their first transaction for more accurate calculation
-        currentNavValue = Number(relevantNavPoints[relevantNavPoints.length - 1].total_nav);
-        ownershipPercentage = initialInvestment / currentNavValue;
-      }
-    }
-    
-    // Look for unusually low ownership percentage
-    if (ownershipPercentage < 0.05) {
-      console.log("Detected abnormally low ownership percentage, applying correction");
-      ownershipPercentage = initialInvestment / currentNavValue * 1.15; // Boost by 15%
-    }
-  }
-  
-  // Special handling for Mitchell Pantelides who started in February 2025
-  if (investor.name === "Mitchell Pantelides") {
-    console.log("Applying enhanced handling for Mitchell Pantelides");
-    // Make sure we have the most recent NAV data for Feb 2025
-    const feb2025Nav = sortedNavHistory.find(nav => 
-      nav.month_end_date.startsWith("2025-02")
-    );
-    
-    if (feb2025Nav) {
-      console.log(`Found February 2025 NAV data: ${feb2025Nav.month_end_date} with NAV ${feb2025Nav.total_nav}`);
-      // If they invested in February 2025, use that specific NAV point
-      if (investor.start_date.startsWith("2025-02")) {
-        currentNavValue = Number(feb2025Nav.total_nav);
-        ownershipPercentage = initialInvestment / currentNavValue;
-      }
-    }
-  }
   
   for (const event of timeline) {
     // Skip events before investor start date
@@ -271,10 +195,6 @@ export function calculateInvestorValue(
       // Calculate investor's value right before the transaction
       const investorValueBeforeTransaction = currentNavValue * ownershipPercentage;
       
-      console.log(`Transaction on ${transaction.date}: ${transaction.type} of ${transaction.amount}`);
-      console.log(`NAV value at transaction: ${currentNavValue}`);
-      console.log(`Owner value before transaction: ${investorValueBeforeTransaction}`);
-      
       if (transaction.type === 'contribution') {
         // Add contribution amount to investor's value
         const newInvestorValue = investorValueBeforeTransaction + Number(transaction.amount);
@@ -285,49 +205,19 @@ export function calculateInvestorValue(
         // Subtract withdrawal amount from investor's value
         const newInvestorValue = investorValueBeforeTransaction - Number(transaction.amount);
         // Recalculate ownership percentage
-        ownershipPercentage = Math.max(0, newInvestorValue / currentNavValue); // Ensure non-negative
+        ownershipPercentage = newInvestorValue / currentNavValue;
       }
-      
-      console.log(`Ownership % after transaction: ${ownershipPercentage}`);
     }
   }
   
   // Calculate final value based on ownership percentage and latest NAV
-  let currentValue = Number(latestNav.total_nav) * ownershipPercentage;
+  const currentValue = Number(latestNav.total_nav) * ownershipPercentage;
   
   // Calculate total invested amount accounting for all contributions and withdrawals
   const totalInvested = calculateTotalInvested(initialInvestment, sortedTransactions);
   
   // Calculate return percentage
-  let returnPercentage = calculateReturn(totalInvested, currentValue);
-  
-  console.log(`Latest NAV date: ${latestNav.month_end_date}`);
-  console.log(`Latest NAV value: ${latestNav.total_nav}`);
-  console.log(`Final ownership percentage: ${ownershipPercentage}`);
-  console.log(`Final current value: ${currentValue}`);
-  console.log(`Return percentage: ${returnPercentage}%`);
-  
-  // Final override for Mitchell Pantelides if still showing negative return
-  if (investor.name === "Mitchell Pantelides" && returnPercentage < 0) {
-    console.log("Overriding Mitchell's final calculation due to negative return");
-    const modestReturn = 5; // 5%
-    currentValue = Number(investor.initial_investment) * (1 + modestReturn/100);
-    returnPercentage = modestReturn;
-    
-    console.log(`Adjusted current value: ${currentValue}`);
-    console.log(`Adjusted return percentage: ${returnPercentage}%`);
-  }
-  
-  // Final override for Marc & Kim Daudet if still showing negative return
-  if (investor.name === "Marc & Kim Daudet" && returnPercentage < 0) {
-    console.log("Overriding Marc & Kim's final calculation due to negative return");
-    const modestReturn = 10; // 10%
-    currentValue = Number(investor.initial_investment) * (1 + modestReturn/100);
-    returnPercentage = modestReturn;
-    
-    console.log(`Adjusted current value: ${currentValue}`);
-    console.log(`Adjusted return percentage: ${returnPercentage}%`);
-  }
+  const returnPercentage = calculateReturn(totalInvested, currentValue);
   
   return {
     currentValue,
