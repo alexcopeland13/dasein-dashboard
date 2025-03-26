@@ -104,7 +104,7 @@ export function calculateInvestorValue(
     const lastWithdrawal = [...transactions]
       .filter(t => t.type === "withdrawal")
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-      
+
     if (lastWithdrawal) {
       // For closed accounts, calculate return based on final withdrawal
       const totalInvested = calculateTotalInvested(Number(investor.initial_investment), transactions);
@@ -113,112 +113,81 @@ export function calculateInvestorValue(
         returnPercentage: calculateReturn(totalInvested, Number(lastWithdrawal.amount))
       };
     }
-    
+
     return { currentValue: 0, returnPercentage: 0 };
   }
-  
-  // Sort the NAV history by date (oldest first)
+
+  // Sort NAV history by date (oldest first)
   const sortedNavHistory = [...allNavHistory].sort(
     (a, b) => new Date(a.month_end_date).getTime() - new Date(b.month_end_date).getTime()
   );
-  
+
   // Sort transactions by date (oldest first)
   const sortedTransactions = [...transactions].sort(
     (a, b) => new Date(a.date).getTime() - new Date(a.date).getTime()
   );
-  
-  // Find the appropriate NAV value at the time of initial investment
+
+  // Start with initial investment
   const startDate = new Date(investor.start_date);
-  const startDay = startDate.getDate();
-  
-  // Determine which NAV point to use for initial investment calculation
-  let initialNavPoint = null;
-  let initialNavValue = 0;
-  
-  // If investor started on the 1st day of a month, use the start_nav for that month
-  if (startDay === 1) {
-    // Find the month that contains the start date
-    const monthContainingStart = sortedNavHistory.find(nav => 
-      nav.month_start_date && new Date(nav.month_start_date).getTime() === startDate.getTime()
-    );
-    
-    if (monthContainingStart && monthContainingStart.start_nav) {
-      initialNavPoint = monthContainingStart;
-      initialNavValue = Number(monthContainingStart.start_nav);
+  let currentValue = Number(investor.initial_investment);
+
+  console.log(`INVESTOR: ${investor.name}`);
+  console.log(`  Initial Investment: ${currentValue}`);
+  console.log(`  Start Date: ${investor.start_date}`);
+
+  // Find the NAV point that contains or is immediately after the investor's start date
+  let startNavIndex = 0;
+  for (let i = 0; i < sortedNavHistory.length; i++) {
+    if (new Date(sortedNavHistory[i].month_end_date) >= startDate) {
+      startNavIndex = i;
+      break;
     }
   }
-  
-  // If we couldn't find a match or investor didn't start on the 1st, use closest point before
-  if (!initialNavPoint) {
-    initialNavPoint = findClosestNavPoint(sortedNavHistory, startDate);
-    if (!initialNavPoint) {
-      console.error(`No NAV point found for investor ${investor.name} at start date ${investor.start_date}`);
-      return { currentValue: 0, returnPercentage: 0 };
-    }
-    initialNavValue = Number(initialNavPoint.total_nav);
-  }
-  
-  // Initialize with initial investment and calculate initial ownership percentage
-  const initialInvestment = Number(investor.initial_investment);
-  let ownershipPercentage = initialInvestment / initialNavValue;
-  
-  // Create a unified timeline of NAV points and transactions
-  const timeline = createUnifiedTimeline(sortedNavHistory, sortedTransactions);
-  
-  // Process the timeline to track ownership percentage changes
-  let currentNavValue = initialNavValue;
-  
-  for (const event of timeline) {
-    // Skip events before investor start date
-    if (event.date < startDate) continue;
-    
-    if (event.type === 'nav') {
-      const navPoint = event.data as MonthlyNav;
-      
-      // If this is a month start and we have start_nav, use it
-      if (navPoint.month_start_date && 
-          new Date(navPoint.month_start_date).getTime() === event.date.getTime() && 
-          navPoint.start_nav) {
-        currentNavValue = Number(navPoint.start_nav);
-      } 
-      // If this is a month end, use total_nav
-      else if (new Date(navPoint.month_end_date).getTime() === event.date.getTime()) {
-        currentNavValue = Number(navPoint.total_nav);
-      }
-    } 
-    else if (event.type === 'transaction') {
-      const transaction = event.data as CapitalFlow;
-      
-      // Skip transactions not belonging to this investor
-      if (transaction.investor_id !== investor.id) continue;
-      
-      // Calculate investor's value right before the transaction
-      const investorValueBeforeTransaction = currentNavValue * ownershipPercentage;
-      
-      if (transaction.type === 'contribution') {
-        // Add contribution amount to investor's value
-        const newInvestorValue = investorValueBeforeTransaction + Number(transaction.amount);
-        // Recalculate ownership percentage
-        ownershipPercentage = newInvestorValue / currentNavValue;
-      } 
-      else if (transaction.type === 'withdrawal') {
-        // Subtract withdrawal amount from investor's value
-        const newInvestorValue = investorValueBeforeTransaction - Number(transaction.amount);
-        // Recalculate ownership percentage
-        ownershipPercentage = newInvestorValue / currentNavValue;
+
+  // Process each month after the investor's start date
+  for (let i = startNavIndex; i < sortedNavHistory.length - 1; i++) {
+    const currentMonth = sortedNavHistory[i];
+    const nextMonth = sortedNavHistory[i + 1];
+
+    // Calculate month's percentage return
+    const monthReturn = (Number(nextMonth.total_nav) - Number(currentMonth.total_nav)) / Number(currentMonth.total_nav);
+
+    // Apply return to current value
+    const valueBeforeReturn = currentValue;
+    currentValue = currentValue * (1 + monthReturn);
+
+    console.log(`  Month ${currentMonth.month_end_date} to ${nextMonth.month_end_date}: Return ${(monthReturn * 100).toFixed(2)}%`);
+    console.log(`    Value before: ${valueBeforeReturn.toFixed(2)}, After: ${currentValue.toFixed(2)}`);
+
+    // Apply any transactions in this period
+    const periodStart = new Date(currentMonth.month_end_date);
+    const periodEnd = new Date(nextMonth.month_end_date);
+
+    for (const transaction of sortedTransactions) {
+      const transactionDate = new Date(transaction.date);
+
+      if (transactionDate > periodStart && transactionDate <= periodEnd) {
+        if (transaction.type === 'contribution') {
+          currentValue += Number(transaction.amount);
+          console.log(`    Added contribution: ${Number(transaction.amount)}, New value: ${currentValue.toFixed(2)}`);
+        } else if (transaction.type === 'withdrawal') {
+          currentValue -= Number(transaction.amount);
+          console.log(`    Subtracted withdrawal: ${Number(transaction.amount)}, New value: ${currentValue.toFixed(2)}`);
+        }
       }
     }
   }
-  
-  // Calculate final value based on ownership percentage and latest NAV
-  const currentValue = Number(latestNav.total_nav) * ownershipPercentage;
-  
+
   // Calculate total invested amount accounting for all contributions and withdrawals
-  const totalInvested = calculateTotalInvested(initialInvestment, sortedTransactions);
-  
+  const totalInvested = calculateTotalInvested(Number(investor.initial_investment), sortedTransactions);
+
   // Calculate return percentage
   const returnPercentage = calculateReturn(totalInvested, currentValue);
-  
+
+  console.log(`  Final value: ${currentValue.toFixed(2)}`);
+  console.log(`  Total invested: ${totalInvested.toFixed(2)}`);
+  console.log(`  Return: ${returnPercentage.toFixed(2)}%`);
+
   return {
     currentValue,
     returnPercentage
